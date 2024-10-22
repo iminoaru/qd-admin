@@ -165,13 +165,13 @@ export default function Component() {
 
   return (
     <div className="container mx-auto px-2 py-8">
-      <h1 className="text-3xl font-bold mb-8">JSON Editor Tool</h1>
+      <h1 className="text-3xl font-bold mb-8">QD admin panel</h1>
 
       {!isFileUploaded && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Upload JSON File</CardTitle>
-            <CardDescription>Select a JSON file to upload and edit</CardDescription>
+            <CardDescription>Upload our scraped data in .json format</CardDescription>
           </CardHeader>
           <CardContent>
             <label htmlFor="file-upload" className="cursor-pointer">
@@ -180,7 +180,7 @@ export default function Component() {
                   <Upload className="mx-auto h-12 w-12 text-gray-400" />
                   <div className="flex text-sm text-gray-600">
                     <span className="relative rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                      Upload a file
+                      Upload JSON
                     </span>
                     <input id="file-upload" name="file-upload" type="file" accept=".json" className="sr-only" onChange={handleFileUpload} />
                   </div>
