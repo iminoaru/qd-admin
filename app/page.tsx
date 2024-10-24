@@ -8,15 +8,23 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ChevronLeft, ChevronRight, Upload, Download, Search } from 'lucide-react'
 import MarkdownLatexRenderer from '@/components/MarkdownLatexRenderer'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { X } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 
 export default function Component() {
-  const [jsonData, setJsonData] = useState<any[]>([])
+  const [editableData, setEditableData] = useState<any[]>([])
+  const [ogData, setOgData] = useState<any[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [editedEntry, setEditedEntry] = useState<any>(null)
-  const [isFileUploaded, setIsFileUploaded] = useState(false)
+  const [isEditableFileUploaded, setIsEditableFileUploaded] = useState(false)
+  const [isOgFileUploaded, setIsOgFileUploaded] = useState(false)
+  const [showOgPreview, setShowOgPreview] = useState(true)
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEditableFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const fileReader = new FileReader()
     const file = event.target.files?.[0]
 
@@ -38,9 +46,50 @@ export default function Component() {
             })
             .filter((item) => item !== null)
 
-          setJsonData(parsedData)
+          // Initialize is_paid to 'FALSE' and subcategory, company to empty arrays
+          const initializedData = parsedData.map((item) => ({
+            ...item,
+            is_paid: 'FALSE',
+            subcategory: item.subcategory || [],
+            company: item.company || [],
+          }))
+
+          setEditableData(initializedData)
           setCurrentIndex(0)
-          setIsFileUploaded(true)
+          setIsEditableFileUploaded(true)
+        } catch (error: any) {
+          console.error('Error processing file:', error)
+          alert(`Error processing file: ${error.message}`)
+        }
+      }
+      fileReader.readAsText(file)
+    }
+  }
+
+  const handleOgFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileReader = new FileReader()
+    const file = event.target.files?.[0]
+
+    if (file) {
+      fileReader.onload = (e) => {
+        try {
+          const content = e.target?.result as string
+          const lines = content.split(/\r?\n/)
+          const parsedData = lines
+            .map((line, index) => {
+              const trimmedLine = line.trim()
+              if (trimmedLine === '') return null
+              try {
+                return JSON.parse(trimmedLine)
+              } catch (err) {
+                console.error(`Error parsing JSON on line ${index + 1}:`, err)
+                throw err
+              }
+            })
+            .filter((item) => item !== null)
+
+          setOgData(parsedData)
+          setIsOgFileUploaded(true)
         } catch (error: any) {
           console.error('Error processing file:', error)
           alert(`Error processing file: ${error.message}`)
@@ -51,20 +100,20 @@ export default function Component() {
   }
 
   useEffect(() => {
-    if (jsonData.length > 0) {
-      setEditedEntry(jsonData[currentIndex])
+    if (editableData.length > 0) {
+      setEditedEntry(editableData[currentIndex])
     }
-  }, [currentIndex, jsonData])
+  }, [currentIndex, editableData])
 
   const saveCurrentEntry = (updatedEntry: any) => {
-    const updatedData = [...jsonData]
+    const updatedData = [...editableData]
     updatedData[currentIndex] = updatedEntry
-    setJsonData(updatedData)
+    setEditableData(updatedData)
     setEditedEntry(updatedEntry)
   }
 
   const handleNext = () => {
-    if (currentIndex < jsonData.length - 1) {
+    if (currentIndex < editableData.length - 1) {
       saveCurrentEntry(editedEntry)
       setCurrentIndex(currentIndex + 1)
     }
@@ -78,7 +127,7 @@ export default function Component() {
   }
 
   const handleSearch = () => {
-    const index = jsonData.findIndex((item) =>
+    const index = editableData.findIndex((item) =>
       item.name.toLowerCase().includes(searchQuery.toLowerCase())
     )
     if (index !== -1) {
@@ -96,43 +145,157 @@ export default function Component() {
       setLocalEditedEntry(entry)
     }, [entry])
 
-    const handleChange = (key: string, value: string) => {
+    const handleChange = (key: string, value: any) => {
       setLocalEditedEntry((prevState: any) => ({ ...prevState, [key]: value }))
     }
 
-    const renderInputFields = () => {
-      return Object.keys(localEditedEntry).map((key) => (
-        <div key={key} className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-            {key}:
-          </label>
-          <Textarea
-            value={localEditedEntry[key]}
-            onChange={(e) => handleChange(key, e.target.value)}
-            rows={key === 'problem_text' || key === 'solution' || key === 'hints' ? 6 : 2}
-            className="w-full"
-          />
-        </div>
-      ))
+    const handleArrayChange = (key: string, value: string) => {
+      setLocalEditedEntry((prevState: any) => ({
+        ...prevState,
+        [key]: [...(prevState[key] || []), value],
+      }))
     }
 
-    const PreviewCard = ({ title, content }: { title: string; content: string }) => (
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ScrollArea className="h-[200px] w-full" type="always">
-            <div className="p-4">
-              <MarkdownLatexRenderer content={content} />
+    const handleArrayRemove = (key: string, index: number) => {
+      setLocalEditedEntry((prevState: any) => ({
+        ...prevState,
+        [key]: prevState[key].filter((_: any, i: number) => i !== index),
+      }))
+    }
+
+    const renderInputFields = () => {
+      return Object.keys(localEditedEntry).map((key) => {
+        if (key === 'is_paid') {
+          return (
+            <div key={key} className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                {key}:
+              </label>
+              <Select
+                value={localEditedEntry[key]}
+                onValueChange={(value) => handleChange(key, value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TRUE">TRUE</SelectItem>
+                  <SelectItem value="FALSE">FALSE</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-    )
+          )
+        } else if (key === 'subcategory' || key === 'company') {
+          return (
+            <div key={key} className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                {key}:
+              </label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {localEditedEntry[key]?.map((item: string, index: number) => (
+                  <Badge key={index} variant="secondary">
+                    {item}
+                    <X
+                      className="ml-1 cursor-pointer"
+                      onClick={() => handleArrayRemove(key, index)}
+                    />
+                  </Badge>
+                ))}
+              </div>
+              <Input
+                type="text"
+                placeholder={`Add to ${key}`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.currentTarget.value) {
+                    e.preventDefault()
+                    handleArrayChange(key, e.currentTarget.value)
+                    e.currentTarget.value = ''
+                  }
+                }}
+              />
+            </div>
+          )
+        } else if (key === 'category') {
+          return (
+            <div key={key} className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                {key}:
+              </label>
+              <Select
+                value={localEditedEntry[key]}
+                onValueChange={(value) => handleChange(key, value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Brainteaser">Brainteaser</SelectItem>
+                  <SelectItem value="Combinatorics">Combinatorics</SelectItem>
+                  <SelectItem value="Finance">Finance</SelectItem>
+                  <SelectItem value="Maths">Maths</SelectItem>
+                  <SelectItem value="Probability">Probability</SelectItem>
+                  <SelectItem value="Statistics">Statistics</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )
+        } else if (key === 'problem_text' || key === 'solution' || key === 'hints' || key === 'answer') {
+          return (
+            <div key={key} className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                {key}:
+              </label>
+              <Textarea
+                value={localEditedEntry[key] || ''}
+                onChange={(e) => handleChange(key, e.target.value)}
+                rows={6}
+                className="w-full"
+              />
+            </div>
+          )
+        } else {
+          return (
+            <div key={key} className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                {key}:
+              </label>
+              <Input
+                value={localEditedEntry[key] || ''}
+                onChange={(e) => handleChange(key, e.target.value)}
+                className="w-full"
+              />
+            </div>
+          )
+        }
+      })
+    }
+
+    const PreviewCard = ({ title, content }: { title: string; content?: string }) => {
+      if (!content) return null
+      return (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>{title}</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[200px] w-full" type="always">
+              <div className="p-4">
+                <MarkdownLatexRenderer content={content} />
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    // Find the corresponding entry in ogData
+    const ogEntry = ogData.find((item) => item.unique_name === localEditedEntry.unique_name)
+
+    // Determine the number of columns based on showOgPreview
+    const gridCols = showOgPreview && isOgFileUploaded && ogEntry ? 'md:grid-cols-3' : 'md:grid-cols-2'
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+      <div className={`grid grid-cols-1 ${gridCols} gap-6 mt-6`}>
         <Card>
           <CardHeader>
             <CardTitle>Edit Entry</CardTitle>
@@ -149,40 +312,83 @@ export default function Component() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Preview</CardTitle>
+            <CardTitle>Preview (Editable Data)</CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[calc(100vh-300px)]">
-              <PreviewCard title="Problem Text" content={localEditedEntry.problem_text} />
-              <PreviewCard title="Solution" content={localEditedEntry.solution} />
-              <PreviewCard title="Hints" content={localEditedEntry.hints} />
+            <ScrollArea className="h-[calc(100vh-300px)]" type="always">
+              {localEditedEntry.problem_text && (
+                <PreviewCard title="Problem Text" content={localEditedEntry.problem_text} />
+              )}
+              {localEditedEntry.solution && (
+                <PreviewCard title="Solution" content={localEditedEntry.solution} />
+              )}
+              {localEditedEntry.hints && (
+                <PreviewCard title="Hints" content={localEditedEntry.hints} />
+              )}
+              {localEditedEntry.answer && (
+                <PreviewCard title="Answer" content={localEditedEntry.answer} />
+              )}
             </ScrollArea>
           </CardContent>
         </Card>
+
+        {isOgFileUploaded && ogEntry && showOgPreview && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Original Data Preview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[calc(100vh-300px)]" type="always">
+                <div className="mb-4">
+                  <strong>Name:</strong> {ogEntry.name}
+                </div>
+                {ogEntry.problem_text && (
+                  <PreviewCard title="Problem Text" content={ogEntry.problem_text} />
+                )}
+                {ogEntry.solution && (
+                  <PreviewCard title="Solution" content={ogEntry.solution} />
+                )}
+                {ogEntry.hints && (
+                  <PreviewCard title="Hints" content={ogEntry.hints} />
+                )}
+                {ogEntry.answer && (
+                  <PreviewCard title="Answer" content={ogEntry.answer} />
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        )}
       </div>
     )
   }
 
   return (
     <div className="container mx-auto px-2 py-8">
-      <h1 className="text-3xl font-bold mb-8">QD admin panel</h1>
+      <h1 className="text-3xl font-bold mb-8">QD Admin Panel</h1>
 
-      {!isFileUploaded && (
+      {!isEditableFileUploaded && (
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Upload JSON File</CardTitle>
-            <CardDescription>Upload our scraped data in .json format</CardDescription>
+            <CardTitle>Upload Editable JSON File</CardTitle>
+            <CardDescription>Upload the data you want to edit in JSON format</CardDescription>
           </CardHeader>
           <CardContent>
-            <label htmlFor="file-upload" className="cursor-pointer">
+            <label htmlFor="editable-file-upload" className="cursor-pointer">
               <div className="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
                 <div className="space-y-1 text-center">
                   <Upload className="mx-auto h-12 w-12 text-gray-400" />
                   <div className="flex text-sm text-gray-600">
-                    <span className="relative rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                      Upload JSON
+                    <span className="relative rounded-md font-medium text-indigo-600 hover:text-indigo-500">
+                      Upload Editable JSON
                     </span>
-                    <input id="file-upload" name="file-upload" type="file" accept=".json" className="sr-only" onChange={handleFileUpload} />
+                    <input
+                      id="editable-file-upload"
+                      name="editable-file-upload"
+                      type="file"
+                      accept=".json,.jsonl"
+                      className="sr-only"
+                      onChange={handleEditableFileUpload}
+                    />
                   </div>
                   <p className="text-xs text-gray-500">JSON files only</p>
                 </div>
@@ -192,7 +398,39 @@ export default function Component() {
         </Card>
       )}
 
-      {isFileUploaded && jsonData.length > 0 && editedEntry && (
+      {!isOgFileUploaded && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Upload Original JSON File</CardTitle>
+            <CardDescription>Upload the original data for reference</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <label htmlFor="og-file-upload" className="cursor-pointer">
+              <div className="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
+                <div className="space-y-1 text-center">
+                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                  <div className="flex text-sm text-gray-600">
+                    <span className="relative rounded-md font-medium text-indigo-600 hover:text-indigo-500">
+                      Upload Original JSON
+                    </span>
+                    <input
+                      id="og-file-upload"
+                      name="og-file-upload"
+                      type="file"
+                      accept=".json,.jsonl"
+                      className="sr-only"
+                      onChange={handleOgFileUpload}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">JSON files only</p>
+                </div>
+              </div>
+            </label>
+          </CardContent>
+        </Card>
+      )}
+
+      {isEditableFileUploaded && editableData.length > 0 && editedEntry && (
         <div>
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
@@ -200,28 +438,40 @@ export default function Component() {
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-sm font-medium">
-                Entry {currentIndex + 1} of {jsonData.length}
+                Entry {currentIndex + 1} of {editableData.length}
               </span>
               <Button
                 onClick={handleNext}
-                disabled={currentIndex === jsonData.length - 1}
+                disabled={currentIndex === editableData.length - 1}
                 variant="outline"
                 size="icon"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-            <div className="flex items-center space-x-2">
-              <Input
-                type="text"
-                placeholder="Search by name"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64"
-              />
-              <Button onClick={handleSearch} variant="outline" size="icon">
-                <Search className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Input
+                  type="text"
+                  placeholder="Search by name"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-64"
+                />
+                <Button onClick={handleSearch} variant="outline" size="icon">
+                  <Search className="h-4 w-4" />
+                </Button>
+              </div>
+              {isOgFileUploaded && (
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="showOgPreview"
+                    checked={showOgPreview}
+                    onCheckedChange={(checked) => setShowOgPreview(checked)}
+                  />
+                  <Label htmlFor="showOgPreview">Show Original Preview</Label>
+                </div>
+              )}
             </div>
           </div>
 
@@ -233,7 +483,7 @@ export default function Component() {
                 const dataStr =
                   'data:text/json;charset=utf-8,' +
                   encodeURIComponent(
-                    jsonData.map((obj) => JSON.stringify(obj)).join('\n')
+                    editableData.map((obj) => JSON.stringify(obj)).join('\n')
                   )
                 const downloadAnchorNode = document.createElement('a')
                 downloadAnchorNode.setAttribute('href', dataStr)
