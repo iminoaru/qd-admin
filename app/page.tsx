@@ -127,14 +127,35 @@ export default function Component() {
   }
 
   const handleSearch = () => {
-    const index = editableData.findIndex((item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    // First try to find by serial_number
+    let index = editableData.findIndex((item) => 
+      item.serial_number?.toString() === searchQuery
     )
+    
+    // If not found by serial_number, then search by name
+    if (index === -1) {
+      index = editableData.findIndex((item) =>
+        item.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    }
+
     if (index !== -1) {
       saveCurrentEntry(editedEntry)
       setCurrentIndex(index)
     } else {
       alert('No matching entry found')
+    }
+  }
+
+  const handleDelete = () => {
+    if (window.confirm('Are you sure you want to delete this entry?')) {
+      const newData = editableData.filter((_, index) => index !== currentIndex)
+      setEditableData(newData)
+      
+      // Adjust current index if necessary
+      if (currentIndex >= newData.length) {
+        setCurrentIndex(Math.max(0, newData.length - 1))
+      }
     }
   }
 
@@ -448,12 +469,15 @@ export default function Component() {
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
+              <Button onClick={handleDelete} variant="destructive">
+                Delete Entry
+              </Button>
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <Input
                   type="text"
-                  placeholder="Search by name"
+                  placeholder="Search by serial number or name"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-64"
