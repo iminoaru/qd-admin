@@ -309,8 +309,8 @@ export default function Component() {
       )
     }
 
-    // Find the corresponding entry in ogData
-    const ogEntry = ogData.find((item) => item.unique_name === localEditedEntry.unique_name)
+    // Change this part to use serial_number instead of unique_name
+    const ogEntry = ogData.find((item) => item.serial_number == localEditedEntry.serial_number)
 
     // Determine the number of columns based on showOgPreview
     const gridCols = showOgPreview && isOgFileUploaded && ogEntry ? 'md:grid-cols-3' : 'md:grid-cols-2'
@@ -362,6 +362,9 @@ export default function Component() {
               <ScrollArea className="h-[calc(100vh-300px)]" type="always">
                 <div className="mb-4">
                   <strong>Name:</strong> {ogEntry.name}
+                </div>
+                <div className="mb-4">
+                  <strong>Difficulty:</strong> {ogEntry.difficulty || 'N/A'}
                 </div>
                 {ogEntry.problem_text && (
                   <PreviewCard title="Problem Text" content={ogEntry.problem_text} />
