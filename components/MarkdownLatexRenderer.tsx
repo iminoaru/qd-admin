@@ -6,8 +6,11 @@ import remarkGfm from 'remark-gfm'; // GitHub Flavored Markdown
 import 'katex/dist/katex.min.css'; // Import the KaTeX CSS
 
 // Function to preprocess the content, ensuring proper escaping for inline and block LaTeX
-const preprocessContent = (content: string) => {
-    let processed = content;
+const preprocessContent = (content: string | null | undefined) => {
+    // Return empty string if content is null or undefined
+    if (!content) return '';
+    
+    let processed = content.toString();
 
     // Handle potential issues with double dollar signs for block LaTeX
     processed = processed.replace(/\$\$(.+?)\$\$/g, (match, p1) => {
@@ -22,13 +25,13 @@ const preprocessContent = (content: string) => {
     return processed;
 };
 
-const MarkdownLaTeXRenderer = ({ content }: { content: string }) => {
+const MarkdownLaTeXRenderer = ({ content }: { content: string | null | undefined }) => {
     const processedContent = preprocessContent(content);
 
     return (
         <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkMath]} // Add GFM and Math plugins
-            rehypePlugins={[rehypeKatex]} // KaTeX plugin for rendering LaTeX
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
         >
             {processedContent}
         </ReactMarkdown>
